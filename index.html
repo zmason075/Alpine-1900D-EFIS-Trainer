@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>1900D EFIS Failure Trainer</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Archivo+Narrow:wght@500;700&display=swap">
+<style>
+/* Same vintage-POH page as the annunciator trainer: cream page on a black desk, double-ruled header,
+   dotted-leader checklists. The instrument panel itself stays dark, like a photo pasted on the page. */
+:root{color-scheme:light;
+ --desk:#161513;--page:#f5f2e8;--ink:#15120e;--mut:#6a6355;
+ --red:#b3261e;--redtint:#f5ddd8;--yel:#e2b32b;--ora:#e2711d;--blu:#1f4e8c;--grn:#2d6a1f;
+ --face:#aeb3ba;--bez:#1b1d21;
+ --sans:"Archivo","Helvetica Neue",Helvetica,Arial,sans-serif;--cond:"Archivo Narrow","Arial Narrow","Helvetica Neue",Arial,sans-serif}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--desk);color:var(--ink);font-family:var(--sans);-webkit-tap-highlight-color:transparent}
+:focus-visible{outline:3px solid var(--blu);outline-offset:2px}
+.stage{position:relative;max-width:1040px;margin:0 auto}
+.page{background:var(--page);padding-block:18px 26px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));min-height:100vh}
+@media (min-width:1080px){
+ .page{margin:24px 0;padding:30px 44px 30px 76px;min-height:0;box-shadow:0 10px 40px #000a;border-radius:2px;
+  background-image:radial-gradient(circle at 34px 130px,var(--desk) 0 9px,#0006 10px,transparent 11px),radial-gradient(circle at 34px 50%,var(--desk) 0 9px,#0006 10px,transparent 11px),radial-gradient(circle at 34px calc(100% - 130px),var(--desk) 0 9px,#0006 10px,transparent 11px)}
+}
+.hd{border-top:6px solid var(--ink);border-bottom:2px solid var(--ink);padding:8px 0;margin-bottom:6px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;position:relative}
+.hd::after{content:"";position:absolute;left:0;right:0;bottom:-6px;border-bottom:1px solid var(--ink)}
+.hd .sec{font-family:var(--cond);font-weight:700;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--mut)}
+.hd h1{margin:2px 0 0;font-weight:800;font-size:clamp(20px,5vw,28px);letter-spacing:.06em;text-transform:uppercase;line-height:1}
+.hd .r{display:flex;align-items:center;gap:12px}
+#prog{font-family:var(--cond);font-weight:700;font-size:14px;letter-spacing:.1em;text-transform:uppercase;font-variant-numeric:tabular-nums}
+#hint{margin:14px 0;font-size:14px;color:var(--mut);font-style:italic;line-height:1.4;min-height:1.4em}
+button{font-family:var(--cond);font-weight:700;font-size:15px;letter-spacing:.14em;text-transform:uppercase;border:2px solid var(--ink);border-radius:0;padding:10px 16px;min-height:44px;cursor:pointer;color:#fff;background:var(--ink)}
+button:hover{background:#34302a}
+button.pri{background:var(--ora);color:var(--ink)}
+button.pri:hover{background:#f08536}
+button.ghost{background:transparent;color:var(--ink)}
+button.ghost:hover{background:#0001}
+button:disabled{opacity:.4;cursor:default}
+.fig{margin:0 0 20px}
+.fig figcaption{margin-top:8px;font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.1em;text-transform:uppercase;border-top:1px solid var(--ink);padding-top:5px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.fig figcaption span{color:var(--mut);font-weight:500}
+.foot{border-top:2px solid var(--ink);margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-family:var(--cond);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+
+/* ---- instrument panel ---- */
+.ckwrap{container-type:inline-size}
+.ckpt{display:grid;grid-template-columns:1fr minmax(0,.46fr) 1fr;grid-template-areas:"p s c";gap:2.2cqw;background:linear-gradient(#c3c7cd,var(--face));border:2px solid var(--ink);border-radius:3px;padding:2cqw}
+.side{grid-area:p;display:flex;flex-direction:column;gap:1.4cqw;min-width:0}
+.side.co{grid-area:c}
+.stby{grid-area:s;display:flex;flex-direction:column;gap:1.6cqw;justify-content:center;min-width:0}
+.sidelbl{font-family:var(--cond);font-weight:700;font-size:max(11px,1.3cqw);letter-spacing:.16em;text-transform:uppercase;color:#2b2e33;text-align:center}
+.efisbox{background:var(--bez);border-radius:4px;padding:1cqw 1.2cqw;display:flex;gap:1cqw;align-items:center;justify-content:center;box-shadow:inset 0 0 0 2px #2c2f34}
+.efisbox .t{font-family:var(--cond);font-weight:700;color:#d9d9d9;font-size:max(9px,1cqw);letter-spacing:.1em;margin-right:.4cqw}
+.lamp{flex:1;max-width:120px;min-height:max(34px,4.2cqw);background:#232220;border:2px solid #3a3a38;color:#6b5a1e;font-family:var(--cond);font-weight:700;font-size:max(10px,1.05cqw);letter-spacing:.04em;line-height:1.05;padding:2px 4px;text-transform:uppercase;cursor:default}
+.lamp:hover{background:#232220}
+.lamp.btn{cursor:pointer}
+.lamp.on{background:#2c2410;color:#ffc63a;text-shadow:0 0 .8cqw #ffb400;box-shadow:inset 0 0 1.2cqw #ffb40088,0 0 1cqw #ffb40066}
+.lamp.on.flash{animation:fl 1s steps(1) infinite}
+@keyframes fl{50%{background:#232220;color:#6b5a1e;text-shadow:none;box-shadow:none}}
+@media (prefers-reduced-motion:reduce){.lamp.on.flash{animation:none}}
+.bezel{background:var(--bez);border-radius:6px;padding:3.5%;box-shadow:inset 0 0 0 2px #34373d,0 2px 0 #0005}
+.bezel svg{display:block;width:100%;height:auto;border-radius:4px}
+.dg{align-self:center;min-height:36px;padding:4px 10px;font-size:max(10px,1cqw);letter-spacing:.08em;background:#2a2c30;border-color:#111;color:#ddd}
+.dg.on{color:#ffc63a;background:#2c2410}
+.gauge{background:var(--bez);border-radius:50%;padding:6%;aspect-ratio:1;max-width:100%}
+.gauge svg,.cmp svg{display:block;width:100%;height:auto}
+.cmp{background:var(--bez);border-radius:5px;padding:5%}
+.glbl{font-family:var(--cond);font-weight:700;font-size:max(9px,1cqw);letter-spacing:.12em;color:#2b2e33;text-align:center;text-transform:uppercase;margin-top:.5cqw}
+
+/* reversionary switch panel: drawn like the aircraft panel, toggles you swipe or tap */
+.rev{margin-top:2cqw;background:linear-gradient(#24272c,#1b1d21);border:2px solid var(--ink);border-radius:3px;padding:2.4cqw 4.5cqw 2.8cqw;display:grid;grid-template-columns:repeat(5,1fr);gap:1.2cqw 1.2cqw;color:#fff;position:relative;user-select:none;-webkit-user-select:none}
+.rev::before,.rev::after{content:"";position:absolute;top:50%;width:2.6cqw;height:2.6cqw;margin-top:-1.3cqw;border-radius:50%;background:radial-gradient(circle at 40% 35%,#e9ecef,#8d939b 60%,#4a4f56);box-shadow:0 1px 2px #000}
+.rev::before{left:1cqw}.rev::after{right:1cqw}
+.tg{display:grid;grid-template-columns:1fr auto 1fr;grid-template-areas:". t ." ". s r" ". b .";justify-items:center;align-items:center;border:2px solid transparent;border-radius:8px;padding:.6cqw .3cqw;min-width:0;transition:border-color .2s,box-shadow .2s}
+.tg .tl,.tg .bl,.tg .rl,.tg .nm{font-family:var(--sans);font-weight:800;font-size:clamp(9px,1.75cqw,17px);line-height:1.02;letter-spacing:.01em;color:#f1f1f1;text-align:center;white-space:nowrap}
+.tg .tl{grid-area:t;align-self:end}
+.tg .bl{grid-area:b;align-self:start}
+.tg .rl{grid-area:r;justify-self:start;padding-left:.4cqw}
+.lv{grid-area:s;width:clamp(30px,6.4cqw,54px);touch-action:none;cursor:grab;border-radius:6px;outline-offset:1px}
+.lv:active{cursor:grabbing}
+.lv svg{display:block;width:100%;height:auto;overflow:visible}
+.lv .sh,.lv .kn,.lv .shs,.lv .kns{transform-box:view-box;transform-origin:20px 40px;transition:transform .22s cubic-bezier(.3,1.5,.5,1)}
+.lv.up .sh,.lv.up .shs{transform:scaleY(1)}
+.lv.up .kn,.lv.up .kns{transform:translateY(-27px)}
+.lv.mid .sh,.lv.mid .shs{transform:scaleY(.04)}
+.lv.mid .kn,.lv.mid .kns{transform:scale(1.35)}
+.lv.dn .sh,.lv.dn .shs{transform:scaleY(-1)}
+.lv.dn .kn,.lv.dn .kns{transform:translateY(27px)}
+@media (prefers-reduced-motion:reduce){.lv .sh,.lv .kn,.lv .shs,.lv .kns{transition:none}}
+.tg.off{border-color:var(--ora);box-shadow:0 0 8px #e2711d55}
+.tg.good{border-color:#3fd45a;box-shadow:0 0 0 1px #3fd45a,0 0 12px #3fd45a66}
+.tg.r1{grid-row:1}
+.tg.br{grid-row:2;grid-template-columns:auto 1.3cqw auto auto;grid-template-areas:"n k t t" "n k s r" "n k b b";justify-self:center;justify-items:start;column-gap:.6cqw}
+.tg.br .nm{grid-area:n;align-self:center;padding-right:.2cqw}
+.tg.br .k{grid-area:k;align-self:stretch;justify-self:stretch;width:1.3cqw;min-width:7px;border:2px solid #f1f1f1;border-right:0;margin:.5em 0}
+.tg.br .lv{justify-self:center}
+.tg.att{grid-column:1/4}.tg.hdg{grid-column:4/6}
+.tg.deco .lv{cursor:pointer}
+
+/* narrow: pilot and copilot side by side, standby underneath */
+@container (max-width:620px){
+ .ckpt{grid-template-columns:1fr 1fr;grid-template-areas:"p c" "s s";gap:3cqw}
+ .stby{flex-direction:row;justify-content:center;gap:5cqw}
+ .stby>div{width:30cqw}
+ .rev{padding:3.5cqw 5cqw 4cqw;gap:3cqw 1cqw}
+ .tg .tl,.tg .bl,.tg .rl,.tg .nm{font-size:2.55cqw}
+ .lv{width:8.2cqw}
+ .efisbox .t{display:none}
+}
+
+/* ---- scenario card (flips like a flashcard) ---- */
+.card{border:2px solid var(--ink);border-left:16px solid var(--yel);background:var(--page);box-shadow:3px 3px 0 #0004;min-height:180px}
+.cin{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.ch{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:2px solid var(--ink);padding-bottom:10px}
+.chip{display:inline-block;font-weight:800;padding:4px 12px;border:2px solid var(--ink);font-size:16px;letter-spacing:.04em;background:var(--ink);color:#fff;text-transform:uppercase}
+.chip.q{background:#fff;color:var(--ink)}
+.chip.y{background:var(--yel);color:var(--ink)}
+.qrh{border:2px solid var(--ink);background:#fbf0c4}
+.qrh-h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;background:var(--yel);border-bottom:2px solid var(--ink);padding:5px 12px;font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.16em;text-transform:uppercase}
+.qrh-b{padding:10px 14px 12px;display:flex;flex-direction:column;gap:10px}
+.qrh .ch{border-bottom-color:#8a6d12}
+.qrh .caut{background:#fff8dc}
+.kind{font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+.brief{font-size:19px;line-height:1.45;font-weight:500;margin:0;max-width:65ch}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row button{flex:1 1 140px}
+.fb{font-size:16px;line-height:1.45;margin:0;padding:10px 12px;border:2px solid var(--ink);display:none}
+.fb.on{display:block}
+.fb.ok{background:#e1eed6;border-color:var(--grn)}
+.fb.no{background:var(--redtint);border-color:var(--red)}
+.fb ul{margin:6px 0 0;padding-left:20px}
+.sec-h{margin:4px 0 0;font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.14em;text-transform:uppercase;border-bottom:1px solid var(--ink);padding-bottom:2px}
+.ind{margin:4px 0 0;padding-left:20px;font-size:16px;line-height:1.4}
+.ck{list-style:none;margin:4px 0 0;padding:0;font-size:16px;line-height:1.35}
+.ck li{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 6px;margin:6px 0}
+.ck .it{flex:0 1 auto;font-weight:600}
+.ck .ld{flex:1 1 20px;min-width:14px;border-bottom:2px dotted var(--ink);transform:translateY(-4px)}
+.ck .ac{flex:0 1 auto;margin-left:auto;font-weight:800;text-align:right}
+.ck .sub{flex:1 0 100%;font-size:15px;color:#3b362e;padding-left:14px}
+.ck .cond{flex:1 0 100%;font-style:italic;font-weight:700;text-align:center;font-size:15px}
+.caut{border:2px solid var(--red);background:var(--redtint);padding:8px 12px;font-size:15px;line-height:1.4}
+.caut b{color:var(--red);letter-spacing:.06em}
+.notes{margin:4px 0 0;padding-left:20px;font-size:15px;line-height:1.4;color:#2e2a24}
+.cf{margin-top:4px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--mut);font-family:var(--cond);font-size:12px;letter-spacing:.1em;text-transform:uppercase;border-top:1px solid var(--ink);padding-top:6px}
+.draft{color:var(--ora);font-weight:700}
+
+.freebar{display:none;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:14px}
+.freebar.on{display:flex}
+.freebar label{display:flex;flex-direction:column;gap:4px;font-family:var(--cond);font-weight:700;font-size:12px;letter-spacing:.14em;text-transform:uppercase;flex:1 1 180px}
+select{font-family:var(--sans);font-size:16px;font-weight:600;background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:0;padding:10px 12px;min-height:46px;width:100%}
+
+/* modals */
+.ov{position:fixed;inset:0;background:rgba(10,9,8,.8);display:none;align-items:flex-start;justify-content:center;padding:max(16px,env(safe-area-inset-top,0px)) 16px 16px;overflow:auto;z-index:20}
+.ov.on{display:flex}
+.box{background:var(--page);border:2px solid var(--ink);padding:22px;max-width:480px;width:100%;margin:auto;box-shadow:6px 6px 0 #000a}
+.box h2{margin:0 0 10px;display:inline-block;border:3px solid var(--ora);color:var(--ora);background:var(--ink);font-weight:800;font-size:19px;letter-spacing:.14em;text-transform:uppercase;padding:6px 12px}
+.box p.sub{margin:0 0 6px;color:var(--mut);font-size:15px;font-style:italic}
+.lbl{margin:16px 0 6px;font-family:var(--cond);font-weight:700;font-size:13px;letter-spacing:.18em;text-transform:uppercase;border-bottom:2px solid var(--ink);padding-bottom:3px}
+.opt{display:block;width:100%;text-align:left;background:transparent;color:var(--ink);border:2px solid var(--ink);margin-bottom:8px;padding:11px 14px 11px 18px;position:relative;text-transform:none;letter-spacing:0;font-family:var(--sans)}
+.opt:hover{background:#0001}
+.opt b{display:block;font-size:17px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.opt span{display:block;font-size:14px;font-weight:500;color:var(--mut);margin-top:2px}
+.opt.sel{background:var(--ink);color:#fff}
+.opt.sel span{color:#cfc9bb}
+.opt.sel::before{content:"";position:absolute;left:0;top:0;bottom:0;width:8px;background:var(--ora)}
+.acts{display:flex;gap:10px;margin-top:18px}
+.howto{margin:6px 0 0;padding-left:20px;font-size:15px;line-height:1.45}
+.howto li{margin:4px 0}
+.howto .o{color:#b4560f;font-weight:800}.howto .g{color:var(--grn);font-weight:800}
+.acts button{flex:1}
+@media (max-width:520px){.brief{font-size:17px}.cin{padding:14px}.card{border-left-width:12px}.ck{font-size:15px}}
+</style>
+</head>
+<body>
+
+<div class="stage"><div class="page">
+ <header class="hd">
+  <div><div class="sec">Avionics / Flight Instruments</div><h1>Beech 1900D EFIS</h1></div>
+  <div class="r"><span id="prog"></span><button id="sndb" class="ghost" aria-pressed="true">Sound on</button><button id="optb" class="ghost">Options</button></div>
+ </header>
+ <div id="hint"></div>
+
+ <div class="freebar" id="freebar">
+  <label>Failure<select id="ffail"></select></label>
+  <label>Side<select id="fside"><option value="1">Pilot</option><option value="2">Copilot</option></select></label>
+  <button id="finject" class="pri">Set failure</button>
+ </div>
+
+ <figure class="fig">
+  <div class="ckwrap">
+   <div class="ckpt">
+    <div class="side" id="s1">
+     <div class="sidelbl">Pilot</div>
+     <div class="efisbox"><span class="t">EFIS</span><button class="lamp" id="dx1" tabindex="-1">Drive<br>Xfr</button><button class="lamp btn" id="cp1">Compare<br>push to reset</button></div>
+     <div class="bezel" id="adi1"></div>
+     <div class="bezel" id="hsi1"></div>
+     <button class="dg" id="dg1" title="Heading gyro mode: press for DG, press again to re-slave">Gyro mode: Slave</button>
+    </div>
+    <div class="stby">
+     <div><div class="gauge" id="sbatt"></div><div class="glbl">Standby attitude</div></div>
+     <div><div class="cmp" id="sbcmp"></div><div class="glbl">Standby compass</div></div>
+    </div>
+    <div class="side co" id="s2">
+     <div class="sidelbl">Copilot</div>
+     <div class="efisbox"><span class="t">EFIS</span><button class="lamp" id="dx2" tabindex="-1">Drive<br>Xfr</button><button class="lamp btn" id="cp2">Compare<br>push to reset</button></div>
+     <div class="bezel" id="adi2"></div>
+     <div class="bezel" id="hsi2"></div>
+     <button class="dg" id="dg2" title="Heading gyro mode: press for DG, press again to re-slave">Gyro mode: Slave</button>
+    </div>
+   </div>
+   <div class="rev" id="rev"></div>
+  </div>
+  <figcaption>Figure 1. EFIS displays and reversionary panel <span>Pilot and copilot</span></figcaption>
+ </figure>
+
+ <figure class="fig">
+  <div class="card" id="card"><div class="cin" id="cin"></div></div>
+  <figcaption>Figure 2. Scenario and QRH checklist <span id="cardcap">Tap the card to flip it</span></figcaption>
+ </figure>
+ <div class="foot"><span>Study aid. Use the current POH and QRH.</span><span>Beech 1900D</span></div>
+</div></div>
+
+<div class="ov" id="opt"><div class="box" role="dialog" aria-modal="true" aria-labelledby="otitle">
+ <h2 id="otitle">EFIS Failure Trainer</h2>
+ <p class="sub">Each scenario sets a failure on the displays. Find it, work the reversionary panel, and the correct switch brings up the remediation and the QRH checklist.</p>
+ <div class="lbl">Order</div>
+ <button class="opt" data-mode="order"><b>In order</b><span>QRH order, side picked at random</span></button>
+ <button class="opt" data-mode="random"><b>Random order</b><span>Every failure once, shuffled, side picked at random</span></button>
+ <button class="opt" data-mode="free"><b>Free study</b><span>Pick any failure and side, and play with the switches</span></button>
+ <div class="lbl">How to use</div>
+ <ul class="howto">
+  <li><b>Swipe a switch up or down</b> to move it, one position per swipe. You can also tap above or below the switch’s pivot, or use the arrow keys.</li>
+  <li>A switch outlined in <span class="o">orange</span> is out of NORM / OFF. <span class="g">Green</span> means it’s in the correct position.</li>
+  <li>When the correct switch is set, the remediation and the QRH checklist show at the bottom.</li>
+  <li><b>XDTA (cross-side data bus):</b> no switch action is needed. Leave the panel in NORM / OFF and tap “No switch action needed.”</li>
+ </ul>
+ <div class="acts"><button id="ocancel" class="ghost">Close</button><button class="pri" id="ostart">Start</button></div>
+</div></div>
+
+<div class="ov" id="done"><div class="box" role="dialog" aria-modal="true" style="text-align:center">
+ <h2>All failures done</h2>
+ <p class="sub" id="dmsg"></p>
+ <div class="acts"><button id="dopt" class="ghost">Options</button><button class="pri" id="drestart">Go again</button></div>
+</div></div>
+
+<script>
+/* ================= flight state and fault model ================= */
+const TRUTH={pitch:2,roll:0,hdg:330,crs:330};
+const SWDEF={pc:'OFF',dsp:'NORM',drx:'NORM',cc:'OFF',att:'NORM',hdg:'NORM'};
+let F,SW,latch,ackSig,dg,lastMis;
+function clearFaults(){
+ F={dpu:{1:1,2:1},dsp:{1:1,2:1},attFail:{},hdgFail:{},attErr:{},hdgErr:{},tube:{},xdta:{1:{},2:{}}};
+ SW={...SWDEF};latch=false;dg={1:false,2:false};lastMis=false;
+}
+const opp=s=>s===1?2:1;
+const swSide=s=>s===1?'1':'2';           // ATT/HDG switch value for "all on side s"
+const swPC=s=>s===1?'PLT':'COPLT';         // DSP / DR XFR switch value for side s
+const SNAME=s=>s===1?'pilot':'copilot';
+
+/* what each side shows, given the faults and switch positions */
+function view(s){
+ const out={s};
+ const drive=SW.drx==='PLT'?1:SW.drx==='COPLT'?2:s;
+ out.drive=drive;
+ out.dpuFail=!F.dpu[drive];
+ let attSide=SW.drx!=='NORM'?drive:SW.att==='1'?1:SW.att==='2'?2:s;
+ let hdgSide=SW.drx!=='NORM'?drive:SW.hdg==='1'?1:SW.hdg==='2'?2:s;
+ if(F.xdta[s].eadi&&attSide!==s)attSide=s;      // no cross-side data: can't bring the other side's attitude over
+ if(F.xdta[s].ehsi&&hdgSide!==s)hdgSide=s;
+ out.attSide=attSide;out.hdgSide=hdgSide;
+ out.attAnn=(SW.drx!=='NORM'||SW.att!=='NORM')?'ATT'+attSide:null;
+ out.magAnn=(SW.drx!=='NORM'||SW.hdg!=='NORM')?'MAG'+hdgSide:null;
+ out.attFail=!!F.attFail[attSide];
+ out.hdgFail=!!F.hdgFail[hdgSide];
+ const a=F.attErr[attSide]||TRUTH;out.pitch=a.pitch;out.roll=a.roll;
+ out.hdg=F.hdgErr[hdgSide]!=null?F.hdgErr[hdgSide]:TRUTH.hdg;
+ if(dg[hdgSide]&&F.hdgErr[hdgSide]==null)out.hdg=TRUTH.hdg; // DG mode alone doesn't change a good heading
+ let dspSide=SW.drx!=='NORM'?drive:SW.dsp==='PLT'?1:SW.dsp==='COPLT'?2:s;
+ if((F.xdta[s].eadi||F.xdta[s].ehsi)&&dspSide!==s)dspSide=s;
+ out.dspSide=dspSide;
+ out.dspAnn=dspSide!==s?'DSP'+dspSide:null;
+ out.dspFlag=!F.dsp[dspSide];
+ out.navSide=dspSide;
+ out.xE=!!F.xdta[s].eadi;out.xH=!!F.xdta[s].ehsi;
+ const cm=(s===1?SW.pc:SW.cc)==='CMPST';
+ const eBad=!!F.tube[s+'a'],hBad=!!F.tube[s+'h'];
+ out.eadi=eBad?'blank':(cm?'comp':'adi');
+ out.ehsi=hBad?'blank':(cm?(eBad?'comp':'blank'):'hsi');
+ if(cm&&eBad&&!hBad)out.ehsi='comp';
+ if(out.dpuFail){if(out.eadi!=='blank')out.eadi='dpu';if(out.ehsi!=='blank')out.ehsi='dpu'}
+ return out;
+}
+function comparators(v1,v2){
+ const attOn=SW.att==='NORM'&&SW.drx==='NORM'&&!v1.attFail&&!v2.attFail&&!v1.dpuFail&&!v2.dpuFail;
+ const hdgOn=SW.hdg==='NORM'&&SW.drx==='NORM'&&!v1.hdgFail&&!v2.hdgFail&&!v1.dpuFail&&!v2.dpuFail;
+ const pit=attOn&&Math.abs(v1.pitch-v2.pitch)>4,roll=attOn&&Math.abs(v1.roll-v2.roll)>4;
+ let dh=Math.abs(((v1.hdg-v2.hdg)%360+540)%360-180);
+ const hd=hdgOn&&dh>6;
+ return {pit,roll,hd,any:pit||roll||hd};
+}
+
+/* ================= drawing ================= */
+const FONT='font-family="Archivo Narrow,Arial Narrow,Arial,sans-serif" font-weight="700"';
+let uid=0;
+function txt(x,y,t,fill,size=12,anchor='start'){return `<text x="${x}" y="${y}" fill="${fill}" font-size="${size}" text-anchor="${anchor}" ${FONT}>${t}</text>`}
+function flag(x,y,t,col='#ff3b2f',size=13,anchor='start'){
+ const w=t.length*size*.62+8,x0=anchor==='middle'?x-w/2:x;
+ return `<rect x="${x0}" y="${y-size}" width="${w}" height="${size+5}" fill="#000" stroke="${col}" stroke-width="1.5"/>`+txt(x0+4,y,t,col,size)}
+const AMB='#ffc21a',GRN='#59e04a',RED='#ff3b2f',MAG='#ff4fd8',CY='#4fd2ff';
+const blankSvg=()=>`<svg viewBox="0 0 200 160"><rect width="200" height="160" fill="#060708"/><path d="M0 0H200L0 120Z" fill="#ffffff06"/></svg>`;
+function dpuSvg(){return `<svg viewBox="0 0 200 160"><rect width="200" height="160" fill="#060708"/>${flag(100,86,'DPU FAIL',RED,16,'middle')}</svg>`}
+function attitude(v,id,h=160){
+ const cy=h===160?80:66,k=2.4;
+ if(v.attFail)return `<rect width="200" height="${h}" fill="#08090a"/>`+flag(18,cy+6,'ATT',RED,16);
+ let lad='';
+ [-20,-15,-10,-5,5,10,15,20].forEach(p=>{const y=cy-p*k,w=p%10===0?34:16;lad+=`<line x1="${100-w/2}" x2="${100+w/2}" y1="${y}" y2="${y}" stroke="#fff" stroke-width="1.4"/>`;
+  if(p%10===0)lad+=txt(100-w/2-4,y+4,Math.abs(p),'#fff',9,'end')+txt(100+w/2+4,y+4,Math.abs(p),'#fff',9)});
+ let ticks='';[-60,-45,-30,-20,-10,10,20,30,45,60].forEach(a=>{const L=Math.abs(a)%30===0?8:5,r=60;
+  ticks+=`<line x1="100" y1="${cy-r}" x2="100" y2="${cy-r-L}" stroke="#fff" stroke-width="1.4" transform="rotate(${a} 100 ${cy})"/>`});
+ return `<defs><clipPath id="c${id}"><rect x="0" y="0" width="200" height="${h}"/></clipPath></defs>
+ <g clip-path="url(#c${id})"><g transform="rotate(${-v.roll} 100 ${cy}) translate(0 ${v.pitch*k})">
+  <rect x="-200" y="${cy-500}" width="600" height="500" fill="#3d8fd8"/><rect x="-200" y="${cy}" width="600" height="500" fill="#8b5a30"/>
+  <line x1="-200" x2="400" y1="${cy}" y2="${cy}" stroke="#fff" stroke-width="1.6"/>${lad}</g></g>
+ ${ticks}<path d="M100 ${cy-60} l-5 -8 h10z" fill="#fff"/>
+ <path d="M100 ${cy-60} l-5 8 h10z" fill="#fff" transform="rotate(${-v.roll} 100 ${cy})"/>
+ <path d="M52 ${cy} h30 v6 h-24 z M148 ${cy} h-30 v6 h24 z" fill="#111" stroke="${MAG}" stroke-width="1.6"/><rect x="97" y="${cy-3}" width="6" height="6" fill="#111" stroke="${MAG}" stroke-width="1.4"/>`;
+}
+function annADI(v,cmp,h=160){
+ let s='';
+ if(v.attAnn)s+=txt(8,16,v.attAnn,AMB,13);
+ if(cmp.pit)s+=txt(192,16,'PIT',AMB,13,'end');
+ if(cmp.roll)s+=txt(192,30,'ROLL',AMB,13,'end');
+ if(v.dspAnn)s+=txt(8,h-8,v.dspAnn,AMB,13);
+ if(v.dspFlag)s+=flag(60,h-8,'DSP',RED,13);
+ if(v.xE)s+=flag(118,h-8,'XDTA',RED,13);
+ return s;
+}
+function adiSvg(v,cmp){const id=++uid;return `<svg viewBox="0 0 200 160">${attitude(v,id)}${annADI(v,cmp)}</svg>`}
+function compSvg(v,cmp){
+ const id=++uid;let s=`<svg viewBox="0 0 200 160">${attitude(v,id,128)}<rect y="128" width="200" height="32" fill="#08090a"/>`;
+ if(v.hdgFail)s+=flag(100,150,'HDG',RED,13,'middle');
+ else{for(let d=-40;d<=40;d+=5){const hv=Math.round(v.hdg/5)*5+d,x=100+(hv-v.hdg)*2.2;if(x<4||x>196)continue;
+   s+=`<line x1="${x}" x2="${x}" y1="128" y2="${hv%10===0?136:133}" stroke="#fff" stroke-width="1.2"/>`;
+   if(((hv%30)+360)%30===0)s+=txt(x,150,lbl(hv),'#fff',11,'middle')}
+  s+=`<path d="M100 128 l-4 -6 h8z" fill="#fff"/>`}
+ if(v.magAnn)s+=txt(8,140,v.magAnn,AMB,11);
+ if(cmp.hd)s+=txt(192,140,'HDG',AMB,11,'end');
+ return s+annADI(v,cmp,128)+'</svg>';
+}
+function lbl(h){h=((h%360)+360)%360;return h===0?'N':h===90?'E':h===180?'S':h===270?'W':String(h/10)}
+function hsiSvg(v,cmp){
+ const cx=100,cy=150,r=104;let s=`<svg viewBox="0 0 200 160"><rect width="200" height="160" fill="#060708"/>`;
+ const navCol=v.navSide===v.s?GRN:AMB;
+ s+=txt(8,16,'VOR'+v.navSide,navCol,12)+txt(192,16,'ET 00:00',GRN,11,'end');
+ if(v.hdgFail){s+=flag(100,80,'HDG',RED,16,'middle')}
+ else{
+  for(let d=-60;d<=60;d+=5){const hv=Math.round(v.hdg/5)*5+d,a=(hv-v.hdg);if(Math.abs(a)>58)continue;
+   const L=hv%10===0?9:5;s+=`<line x1="${cx}" y1="${cy-r}" x2="${cx}" y2="${cy-r+L}" stroke="#fff" stroke-width="1.3" transform="rotate(${a} ${cx} ${cy})"/>`;
+   if(((hv%30)+360)%30===0){const rad=a*Math.PI/180,rr=r-20;s+=txt(cx+rr*Math.sin(rad),cy-rr*Math.cos(rad)+4,lbl(hv),'#fff',12,'middle')}}
+  s+=`<path d="M${cx} ${cy-r-1} l-5 -9 h10z" fill="#fff"/>`;
+  s+=`<g transform="rotate(${v.hdg===null?0:TRUTH.crs-v.hdg} ${cx} 128)"><line x1="${cx}" x2="${cx}" y1="${cy-r+14}" y2="152" stroke="${GRN}" stroke-width="2"/><path d="M${cx} ${cy-r+10} l-5 9 h10z" fill="${GRN}"/></g>`;
+  s+=`<path d="M100 120 v16 M92 126 h16 M96 134 h8" stroke="#fff" stroke-width="2"/>`;
+ }
+ s+=txt(192,154,'CRS 330',GRN,11,'end');
+ if(v.magAnn)s+=txt(8,70,v.magAnn,AMB,13);
+ if(cmp.hd)s+=txt(8,86,'HDG',AMB,13);
+ if(v.dspAnn)s+=txt(8,154,v.dspAnn,AMB,12);
+ if(v.dspFlag)s+=flag(50,154,'DSP',RED,12);
+ if(v.xH)s+=flag(96,154,'XDTA',RED,12);
+ return s+'</svg>';
+}
+function stbySvg(){
+ const id='sb';return `<svg viewBox="0 0 100 100"><defs><clipPath id="${id}"><circle cx="50" cy="50" r="46"/></clipPath></defs>
+ <g clip-path="url(#${id})"><g transform="rotate(${-TRUTH.roll} 50 50) translate(0 ${TRUTH.pitch*1.4})"><rect x="-50" y="-100" width="200" height="150" fill="#3d8fd8"/><rect x="-50" y="50" width="200" height="150" fill="#8b5a30"/><line x1="-50" x2="150" y1="50" y2="50" stroke="#fff" stroke-width="1.2"/>
+ <line x1="40" x2="60" y1="36" y2="36" stroke="#fff"/><line x1="40" x2="60" y1="64" y2="64" stroke="#fff"/></g></g>
+ <path d="M24 50 h18 l4 4 M76 50 h-18 l-4 4" stroke="#ffd21a" stroke-width="3" fill="none"/><circle cx="50" cy="50" r="2" fill="#ffd21a"/>
+ <circle cx="50" cy="50" r="46" fill="none" stroke="#000" stroke-width="2"/></svg>`;
+}
+function cmpSvg(){
+ let s=`<svg viewBox="0 0 120 50"><rect width="120" height="50" rx="4" fill="#0d0d0e"/>`;
+ for(let d=-30;d<=30;d+=5){const hv=Math.round(TRUTH.hdg/5)*5+d,x=60+(hv-TRUTH.hdg)*1.7;
+  s+=`<line x1="${x}" x2="${x}" y1="6" y2="${hv%10===0?16:12}" stroke="#eee" stroke-width="1.2"/>`;
+  if(((hv%30)+360)%30===0)s+=txt(x,32,lbl(hv),'#eee',12,'middle')}
+ return s+`<line x1="60" x2="60" y1="2" y2="46" stroke="#ff7a1a" stroke-width="2"/></svg>`;
+}
+const $=id=>document.getElementById(id);
+function render(){
+ const v1=view(1),v2=view(2),cmp=comparators(v1,v2);
+ if(cmp.any&&!lastMis)latch=true;lastMis=cmp.any;
+ [v1,v2].forEach(v=>{
+  const a=$('adi'+v.s),h=$('hsi'+v.s);
+  a.innerHTML=v.eadi==='blank'?blankSvg():v.eadi==='dpu'?dpuSvg():v.eadi==='comp'?compSvg(v,cmp):adiSvg(v,cmp);
+  h.innerHTML=v.ehsi==='blank'?blankSvg():v.ehsi==='dpu'?dpuSvg():v.ehsi==='comp'?compSvg(v,cmp):hsiSvg(v,cmp);
+  $('cp'+v.s).classList.toggle('on',latch);$('cp'+v.s).classList.toggle('flash',latch);
+  $('dg'+v.s).classList.toggle('on',dg[v.s]);$('dg'+v.s).textContent='Gyro mode: '+(dg[v.s]?'DG':'Slave');
+ });
+ $('dx1').classList.toggle('on',SW.drx==='COPLT');$('dx2').classList.toggle('on',SW.drx==='PLT');
+ $('sbatt').innerHTML=stbySvg();$('sbcmp').innerHTML=cmpSvg();
+ paintSwitches();
+}
+
+/* reversionary panel, laid out like the aircraft:
+   top row  RUD BOOST/YAW DAMP, PLT CMPST, DSP, DR XFR, COPLT CMPST;  bottom row ATT, HDG.
+   Positions are listed top to bottom. Swipe a lever up or down, tap above/below its pivot, or use the arrow keys. */
+const POS={rud:['LEFT','RIGHT'],pc:['CMPST','OFF'],dsp:['PLT','NORM','COPLT'],drx:['PLT','NORM','COPLT'],cc:['CMPST','OFF'],att:['1','NORM','2'],hdg:['1','NORM','2']};
+let RUD='RIGHT';   // rudder boost / yaw damp: drawn for accuracy, not part of any EFIS checklist
+const getV=k=>k==='rud'?RUD:SW[k];
+/* toggle-switch click, synthesized with Web Audio (no sound files) */
+let AC=null,clickBuf=null,soundOn=true;
+try{soundOn=localStorage.getItem('efis1900snd')!=='0'}catch(e){}
+function audio(){
+ if(!soundOn)return null;
+ try{
+  if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;AC=new C();
+   const n=Math.floor(AC.sampleRate*.045);clickBuf=AC.createBuffer(1,n,AC.sampleRate);const d=clickBuf.getChannelData(0);
+   for(let i=0;i<n;i++){const t=i/AC.sampleRate;
+    // a sharp metallic snap, a tiny second contact 9 ms later, and a short low body thump
+    const snap=(Math.random()*2-1)*Math.exp(-t*900);
+    const t2=t-.009,snap2=t2>0?(Math.random()*2-1)*.45*Math.exp(-t2*1300):0;
+    const body=Math.sin(2*Math.PI*190*t)*.5*Math.exp(-t*160);
+    d[i]=(snap+snap2+body)*.9}}
+  if(AC.state==='suspended')AC.resume();
+  return AC}catch(e){return null}
+}
+function click(up){
+ const ac=audio();if(!ac||!clickBuf)return;
+ try{const src=ac.createBufferSource();src.buffer=clickBuf;src.playbackRate.value=up?1.08:.94;
+  const f=ac.createBiquadFilter();f.type='highpass';f.frequency.value=120;
+  const g=ac.createGain();g.gain.value=.55;src.connect(f).connect(g).connect(ac.destination);src.start()}catch(e){}
+}
+function setV(k,v){if(getV(k)===v)return;click(POS[k].indexOf(v)<POS[k].indexOf(getV(k)));if(k==='rud'){RUD=v;paintSwitches();return}SW[k]=v;render();onChange()}
+function step(k,d){const p=POS[k],i=p.indexOf(getV(k)),j=Math.max(0,Math.min(p.length-1,i+d));setV(k,p[j])}
+const lever=()=>`<svg viewBox="0 0 40 80" aria-hidden="true">
+ <rect x="9" y="29" width="22" height="22" rx="3" fill="url(#gPlate)" stroke="#2a2d31" stroke-width="1"/>
+ <circle cx="20" cy="40" r="7" fill="#2b2e33" stroke="#9aa0a8" stroke-width="1.2"/>
+ <g transform="translate(5 6)" opacity=".38"><g class="shs"><rect x="16.5" y="13" width="7" height="27" rx="3.5" fill="#000"/></g><g class="kns"><circle cx="20" cy="40" r="6.5" fill="#000"/></g></g>
+ <g class="sh"><rect x="16.5" y="13" width="7" height="27" rx="3.5" fill="url(#gShaft)"/></g>
+ <g class="kn"><circle cx="20" cy="40" r="6.5" fill="url(#gKnob)" stroke="#6b7078" stroke-width=".6"/></g></svg>`;
+const DEFS=`<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+ <linearGradient id="gShaft" x1="0" x2="1"><stop offset="0" stop-color="#7d838b"/><stop offset=".45" stop-color="#f6f8fa"/><stop offset="1" stop-color="#8f959d"/></linearGradient>
+ <radialGradient id="gKnob" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="#fff"/><stop offset=".45" stop-color="#cfd3d9"/><stop offset="1" stop-color="#6a6f77"/></radialGradient>
+ <linearGradient id="gPlate" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#d9dde2"/><stop offset="1" stop-color="#8e949c"/></linearGradient></defs></svg>`;
+const NAMES={rud:'Rudder boost / yaw damp',pc:'PLT CMPST',dsp:'DSP',drx:'DR XFR',cc:'COPLT CMPST',att:'ATT',hdg:'HDG'};
+const SAY=(k,v)=>k==='att'||k==='hdg'?(v==='1'?'All on No. 1':v==='2'?'All on No. 2':'Norm'):v;
+function cell(k,top,bot,right,cls=''){return `<div class="tg r1 ${cls}" data-k="${k}"><div class="tl">${top}</div><div class="lv" tabindex="0" role="slider" aria-label="${NAMES[k]} switch" data-k="${k}">${lever()}</div>${right?`<div class="rl">${right}</div>`:''}<div class="bl">${bot}</div></div>`}
+function bcell(k,nm){return `<div class="tg br ${k}" data-k="${k}"><div class="nm">${nm}</div><div class="k"></div><div class="tl">ALL ON NO. 1</div><div class="lv" tabindex="0" role="slider" aria-label="${nm} reversionary switch" data-k="${k}">${lever()}</div><div class="rl">NORM</div><div class="bl">ALL ON NO. 2</div></div>`}
+$('rev').innerHTML=DEFS+
+ cell('rud','RUD BOOST<br>YAW DAMP<br>LEFT','RIGHT','','deco')+
+ cell('pc','PLT<br>CMPST','OFF','')+
+ cell('dsp','DSP<br>PLT','COPLT','NORM')+
+ cell('drx','DR XFR<br>PLT','COPLT','NORM')+
+ cell('cc','COPLT<br>CMPST','OFF','')+
+ bcell('att','ATT')+bcell('hdg','HDG');
+function paintSwitches(){
+ const W=cur?cur.want(curSide):{};
+ document.querySelectorAll('.lv').forEach(lv=>{
+  const k=lv.dataset.k,p=POS[k],i=p.indexOf(getV(k));
+  lv.classList.remove('up','mid','dn');
+  lv.classList.add(p.length===2?(i===0?'up':'dn'):(['up','mid','dn'][i]));
+  lv.setAttribute('aria-valuetext',SAY(k,getV(k)));
+  const c=lv.closest('.tg');
+  const good=k!=='rud'&&W[k]!=null&&W[k]===SW[k];
+  c.classList.toggle('good',good);
+  c.classList.toggle('off',!good&&k!=='rud'&&SW[k]!==SWDEF[k]);
+ });
+}
+document.querySelectorAll('.lv').forEach(lv=>{
+ const k=lv.dataset.k;let st=null;
+ lv.addEventListener('pointerdown',e=>{e.preventDefault();audio();lv.focus({preventScroll:true});try{lv.setPointerCapture(e.pointerId)}catch(_){}st={y:e.clientY,moved:false}});
+ lv.addEventListener('pointermove',e=>{if(!st)return;const dy=e.clientY-st.y;if(Math.abs(dy)>14){step(k,dy<0?-1:1);st.y=e.clientY;st.moved=true}});
+ lv.addEventListener('pointerup',e=>{if(!st)return;if(!st.moved){const r=lv.getBoundingClientRect();
+   if(POS[k].length===2)step(k,POS[k].indexOf(getV(k))===0?1:-1);else step(k,e.clientY<r.top+r.height/2?-1:1)}st=null});
+ lv.addEventListener('pointercancel',()=>{st=null});
+ lv.addEventListener('keydown',e=>{if(e.key==='ArrowUp'){step(k,-1);e.preventDefault()}else if(e.key==='ArrowDown'){step(k,1);e.preventDefault()}
+  else if((e.key===' '||e.key==='Enter')&&POS[k].length===2){step(k,POS[k].indexOf(getV(k))===0?1:-1);e.preventDefault()}});
+});
+[1,2].forEach(s=>{
+ $('cp'+s).onclick=()=>{latch=false;render();onChange()};
+ $('dg'+s).onclick=()=>{dg[s]=!dg[s];render();onChange()};
+});
+
+/* ================= the failures (QRH Avionics / Flight Instruments) ================= */
+const sideTxt=s=>s===1?'pilot’s':'copilot’s';
+const FAILS=[
+ {id:'dpu',name:'Display Processor Unit (DPU) failure',page:32,
+  brief:s=>`Cruise in IMC, autopilot engaged. Something just changed on the ${sideTxt(s)} side.`,
+  set:s=>{F.dpu[s]=0},
+  want:s=>({drx:swPC(opp(s))}),
+  ind:['DPU FAIL flag on the EADI and EHSI of the affected side','Both tubes inop (EADI and EHSI) on the affected side'],
+  caution:'The autopilot will automatically disengage when the DR XFR switch is actuated if the autopilot is operating on the side opposite to the DPU selected. Be ready to hand fly before proceeding.',
+  steps:[['DR XFR Switch','SELECT FUNCTIONAL SIDE',['If PLT is selected: ATT1 on both EADIs, MAG1 on both EHSIs, and DRIVE XFR on the copilot’s comparator panel.','If COPLT is selected: ATT2 on both EADIs, MAG2 on both EHSIs, and DRIVE XFR on the pilot’s comparator panel.']],
+   ['Display Select Panel (DSP)','USE THE SIDE SELECTED ABOVE']],
+  notes:['Both EADIs and both EHSIs now show identical information, including the NAV source color, so the NAV source on the failed side shows the opposite of its normal color.','DR XFR in PLT or COPLT makes the opposite DSP inoperative and blanks the opposite autopilot Flight Control Panel.','To resume autopilot or flight director, fly from the side of the operable DPU using that side’s autopilot computer (AP/L or AP/R) or flight director.','If the operating DSP later fails, the DSP on the failed-DPU side may be usable with the DSP reversionary switch, but only if the XDTA flag is not displayed.']},
+ {id:'dsp',name:'Display Select Panel (DSP) failure',page:32,
+  brief:s=>`Climbing through 12,000 ft in IMC. Check both sides’ displays.`,
+  set:s=>{F.dsp[s]=0},
+  want:s=>({dsp:swPC(opp(s))}),
+  ind:['DSP annunciator on the EADI and EHSI'],
+  caution:'Whatever NAV configuration is set on the functional side HSI will be mirrored on both sides. Verify the NAV sources selected before proceeding.',
+  steps:[['DSP Switch','SELECT FUNCTIONAL SIDE',['If PLT is selected: DSP1 is displayed on the copilot’s EADI and EHSI.','If COPLT is selected: DSP2 is displayed on the pilot’s EADI and EHSI.']],
+   ['Functional DSP','CONTROLS BOTH SIDES (MIRRORED)']],
+  notes:['Both EADIs and both EHSIs now show identical information, including the NAV source color.']},
+ {id:'matt',name:'Misleading attitude information',page:33,
+  brief:s=>`Level cruise, wings level in IMC. The comparator just went off.`,
+  set:s=>{F.attErr[s]={pitch:9,roll:14}},
+  want:s=>({att:swSide(opp(s)),reset:1}),
+  ind:['PIT and/or ROLL annunciator on both EADIs','COMPARE PUSH TO RESET on the pilot and copilot comparator panels: more than 4° (3° with glideslope captured) difference in pitch and/or roll'],
+  steps:[['Standby Attitude Indicator','MONITOR TO DETERMINE WHICH IS CORRECT',['If able, level the wings with pitch flat on the horizon, and verify with secondary indications (airspeed, heading, altitude, etc.).']],
+   ['ATT Reversionary Switch','SELECT FUNCTIONAL SIDE',['Pilot side correct: ALL ON NO. 1. ATT1 is displayed on both EADIs.','Copilot side correct: ALL ON NO. 2. ATT2 is displayed on both EADIs.']],
+   ['Reset Comparator Alert','COMPARE PUSH TO RESET']],
+  notes:['The attitude comparator is disabled when the ATT reversionary switch is out of NORM.']},
+ {id:'mhdg',name:'Misleading heading information',page:33,
+  brief:s=>`Level cruise, wings level, heading 330 on the standby compass. The comparator just went off.`,
+  set:s=>{F.hdgErr[s]=(TRUTH.hdg+24)%360},
+  want:s=>({hdg:swSide(opp(s)),reset:1}),
+  ind:['HDG annunciator on both EHSIs','COMPARE PUSH TO RESET on the pilot and copilot comparator panels: more than 6° (plus 1/2 bank angle) difference in heading'],
+  steps:[['Standby Compass','MONITOR TO DETERMINE WHICH IS CORRECT',['If able, level the wings with pitch flat on the horizon, and verify with secondary indications, such as one side turning and the other not.']],
+   ['Incorrect Side','HEADING GYRO MODE BUTTON',['Press for DG mode, press again to re-slave.']],
+   ['','If heading on the affected side remains incorrect:',null,1],
+   ['HDG Reversionary Switch','SELECT FUNCTIONAL SIDE',['Pilot side correct: ALL ON NO. 1. MAG1 is displayed on both EHSIs.','Copilot side correct: ALL ON NO. 2. MAG2 is displayed on both EHSIs.']],
+   ['Reset Comparator Alert','COMPARE PUSH TO RESET']],
+  caution:'The magnetic standby compass may be drastically affected by electrical current from windshield heat and the vent blowers.',
+  notes:['The heading comparator is disabled when the HDG reversionary switch is out of NORM.','In this trainer the heading stays wrong after the DG/re-slave step, so the HDG switch is needed.']},
+ {id:'attf',name:'Failure of an attitude reference system',page:34,
+  brief:s=>`Descending on a vector in IMC. Scan both EADIs.`,
+  set:s=>{F.attFail[s]=1},
+  want:s=>({att:swSide(opp(s))}),
+  ind:['ATT annunciator (red ATT flag) on an EADI'],
+  steps:[['','If a red ATT flag is displayed on either EADI:',null,1],
+   ['ATT Reversionary Switch','SELECT FUNCTIONAL SIDE',['Pilot side correct: ALL ON NO. 1. ATT1 is displayed on both EADIs.','Copilot side correct: ALL ON NO. 2. ATT2 is displayed on both EADIs.']]],
+  notes:['The attitude comparator is disabled when there is an ATT annunciator on an EADI.']},
+ {id:'hdgf',name:'Failure of a heading reference system',page:34,
+  brief:s=>`Holding at 9,000 ft in IMC. Scan both EHSIs.`,
+  set:s=>{F.hdgFail[s]=1},
+  want:s=>({hdg:swSide(opp(s))}),
+  ind:['HDG annunciator (red HDG flag) on an EHSI'],
+  steps:[['','If a red HDG flag is displayed on either EHSI:',null,1],
+   ['HDG Reversionary Switch','SELECT FUNCTIONAL SIDE',['Pilot side correct: ALL ON NO. 1. MAG1 is displayed on both EHSIs.','Copilot side correct: ALL ON NO. 2. MAG2 is displayed on both EHSIs.']]],
+  notes:['The heading comparator is disabled when there is an HDG annunciator on an EHSI.']},
+ {id:'tube',name:'Failure of any one EFIS tube',page:34,
+  brief:s=>`Intercepting the localizer in IMC. One of the ${sideTxt(s)} displays just changed.`,
+  set:(s,t)=>{F.tube[s+t]=1},
+  want:s=>s===1?{pc:'CMPST'}:{cc:'CMPST'},
+  ind:['A single EFIS tube has gone blank'],
+  steps:[['','If the failure is on the pilot’s side:',null,1],['PLT CMPST Switch','CMPST',['A composite display is shown on the functional tube.']],
+   ['','If the failure is on the copilot’s side:',null,1],['COPLT CMPST Switch','CMPST',['A composite display is shown on the functional tube.']]],
+  notes:[]},
+ {id:'xdta',name:'Failure of cross-side data bus',page:35,
+  brief:s=>`Cruise in IMC. A new flag appeared on the ${sideTxt(s)} side.`,
+  set:(s,t)=>{F.xdta[s][t==='h'?'ehsi':'eadi']=1},
+  want:s=>({}),
+  ind:['XDTA annunciator on the pilot or copilot EADI and/or EHSI','Off-side navigation, heading or attitude information is not available on the side showing XDTA','Usually, but not always, shown with a DPU FAIL flag. If DPU FAIL is displayed, or both tubes are blank on one side, go to the DPU Fail procedure.'],
+  steps:[['','An XDTA flag on an EADI results in:',null,1],
+   ['','a) No transfer of the attitude reference to the opposite side with the ATT reversionary switch. b) Loss of No. 2 navigation information. c) The DSP reversionary switch is non-functional.',null,2],
+   ['','An XDTA flag on an EHSI results in:',null,1],
+   ['','a) No transfer of the heading reference to the opposite side with the HDG reversionary switch. b) Loss of No. 2 navigation information. c) The DSP reversionary switch is non-functional.',null,2]],
+  notes:['No switch action is called for. Leave the reversionary panel in NORM / OFF and check.']}
+];
+
+/* ================= card ================= */
+let mode='order',queue=[],qi=0,cur=null,curSide=1,curT='a',solved=false,tries=0,showingBack=false,started=false;
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function checklistHTML(f){
+ let h=`<div class="ch"><span class="chip y">${esc(f.name)}</span></div>`;
+ h+=`<div class="sec-h">Indications</div><ul class="ind">${f.ind.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`;
+ if(f.caution)h+=`<div class="caut"><b>CAUTION:</b> ${esc(f.caution)}</div>`;
+ h+=`<div class="sec-h">Procedure</div><ul class="ck">`+f.steps.map(([it,ac,sub,kind])=>{
+  if(kind===1)return `<li><span class="cond">${esc(ac)}</span></li>`;
+  if(kind===2)return `<li><span class="sub">${esc(ac)}</span></li>`;
+  return `<li><span class="it">${esc(it)}</span><span class="ld"></span><span class="ac">${esc(ac)}</span>${(sub||[]).map(x=>`<span class="sub">${esc(x)}</span>`).join('')}</li>`}).join('')+`</ul>`;
+ if(f.notes.length)h+=`<div class="sec-h">Notes</div><ul class="notes">${f.notes.map(n=>`<li>${esc(n)}</li>`).join('')}</ul>`;
+ return h;
+}
+function qrhBox(f){return `<div class="qrh"><div class="qrh-h"><span>Abnormal procedure</span><span>QRH p. ${f.page}</span></div><div class="qrh-b">${checklistHTML(f)}</div></div>`}
+function frontHTML(){
+ const f=cur,free=mode==='free',n=free?'':`Scenario ${qi+1} of ${queue.length}`;
+ let h;
+ if(free)h=`<div class="ch"><span class="chip y">${esc(f.name)}</span><span class="kind">${SNAME(curSide)} side · free study</span></div>`;
+ else h=`<div class="ch"><span class="chip ${solved?'y':'q'}">${solved?esc(f.name):'What failed?'}</span><span class="kind">${n}${solved?' · '+SNAME(curSide)+' side':''}</span></div>`;
+ h+=`<p class="brief">${esc(f.brief(curSide))}</p>`;
+ if(free){
+  h+=`<p class="fb" id="fb"></p><div class="row"><button class="ghost" data-a="reset">Reset switches</button><button data-a="flip">Show checklist</button><button class="pri" data-a="check">Check switches</button></div>`;
+  h+=`<div class="cf"><span>Tap the card (not the buttons) to flip to the QRH checklist</span><span class="draft">Draft display: to be refined</span></div>`;
+  return h}
+ if(solved){
+  h+=`<p class="fb on ok" id="fb"><b>Remediated.</b> ${esc(f.name)} on the ${SNAME(curSide)} side. The displays now show the configuration after the checklist.</p>`;
+  h+=qrhBox(f);
+  h+=`<div class="row"><button class="pri" data-a="next">${qi+1<queue.length?'Next failure':'Finish'}</button></div>`;
+ }else{
+  h+=`<p class="fb" id="fb"></p><div class="row"><button class="ghost" data-a="reset">Reset switches</button><button data-a="flip">Peek at checklist</button>${Object.keys(f.want(curSide)).length?'':'<button class="pri" data-a="none">No switch action needed</button>'}</div>`;
+ }
+ h+=`<div class="cf"><span>${solved?'Study aid. Use the current QRH.':'Set the correct switch and the remediation shows here'}</span><span class="draft">Draft display: to be refined</span></div>`;
+ return h;
+}
+function paintCard(){
+ $('cin').innerHTML=showingBack?qrhBox(cur)+`<div class="row"><button data-a="flip">Back to scenario</button></div><div class="cf"><span>Study aid. Use the current QRH.</span><span>Tap to flip back</span></div>`:frontHTML();
+}
+function flipCard(){
+ const c=$('card');
+ const done=()=>{showingBack=!showingBack;paintCard()};
+ if(matchMedia('(prefers-reduced-motion:reduce)').matches||!c.animate){done();return}
+ c.animate([{transform:'scaleX(1)'},{transform:'scaleX(0)'}],{duration:130,easing:'ease-in'}).onfinish=()=>{done();c.animate([{transform:'scaleX(0)'},{transform:'scaleX(1)'}],{duration:150,easing:'ease-out'})};
+}
+function diffs(){
+ const w=cur.want(curSide),want={...SWDEF,...w};delete want.reset;const out=[];
+ const names={pc:'PLT CMPST',cc:'COPLT CMPST',dsp:'DSP',drx:'DR XFR',att:'ATT',hdg:'HDG'};
+ const show=(k,v)=>k==='att'||k==='hdg'?(v==='1'?'ALL ON NO. 1':v==='2'?'ALL ON NO. 2':'NORM'):v;
+ Object.keys(SWDEF).forEach(k=>{if(SW[k]!==want[k])out.push(`${names[k]} should be ${show(k,want[k])}, not ${show(k,SW[k])}.`)});
+ if(w.reset&&latch)out.push('The COMPARE light is still on. Push to reset it.');
+ return out;
+}
+function doCheck(){
+ const d=diffs(),fb=$('fb');tries++;
+ if(!d.length){
+  if(mode!=='free')solved=true;paintCard();const fb2=$('fb');
+  fb2.className='fb on ok';fb2.innerHTML=`<b>Correct.</b> ${esc(cur.name)} on the ${SNAME(curSide)} side. The displays now show the configuration after the checklist.`;
+  $('hint').textContent=mode==='free'?'Try another failure or side from the bar above.':'Look over the displays, then go to the next failure.';
+  return}
+ fb.className='fb on no';
+ fb.innerHTML=tries<2&&mode!=='free'?`<b>Not yet.</b> ${d.length} item${d.length>1?'s':''} differ from the checklist. Check the displays again, or flip the card for the QRH.`:`<b>Not yet.</b><ul>${d.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`;
+}
+$('card').addEventListener('click',e=>{
+ const b=e.target.closest('button[data-a]');
+ if(!b){if(mode==='free'||!solved)flipCard();return}
+ const a=b.dataset.a;
+ if(a==='flip')flipCard();
+ else if(a==='check')doCheck();
+ else if(a==='reset'){SW={...SWDEF};dg={1:false,2:false};render();paintCard();onChange()}
+ else if(a==='next')advance();
+ else if(a==='none'){if(!diffs().length){solved=true;paintCard();$('hint').textContent='Correct. Look over the displays and the checklist, then go to the next failure.'}
+  else{const fb=$('fb');fb.className='fb on no';fb.innerHTML='<b>Not quite.</b> No switch action is called for here. Return the reversionary panel to NORM / OFF first.'}}
+});
+function onChange(){
+ if(mode!=='free'&&cur&&!solved&&Object.keys(cur.want(curSide)).length&&!diffs().length){solved=true;showingBack=false;paintCard();
+  $('hint').textContent='Remediated. Look over the displays and the checklist, then go to the next failure.';return}
+ const fb=$('fb');if(fb&&!solved){fb.className='fb'}}
+
+/* ================= flow ================= */
+function loadScenario(f,side,t){
+ clearFaults();cur=f;curSide=side;curT=t||(Math.random()<.5?'a':'h');
+ f.set(side,curT);solved=false;tries=0;showingBack=false;render();paintCard();
+ $('prog').textContent=mode==='free'?'Free study':`${qi+1} / ${queue.length}`;
+ $('hint').textContent=mode==='free'?'Set a failure from the bar above. The displays update live as you move switches.':'Scan the displays and comparator panels, then swipe or tap the correct switch on the reversionary panel.';
+}
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function begin(){
+ started=true;$('opt').classList.remove('on');
+ $('freebar').classList.toggle('on',mode==='free');
+ if(mode==='free'){qi=0;queue=[];loadScenario(FAILS[+$('ffail').value||0],+$('fside').value);return}
+ queue=mode==='random'?shuffle(FAILS):FAILS.slice();qi=0;
+ loadScenario(queue[0],Math.random()<.5?1:2);
+}
+function advance(){
+ if(qi+1>=queue.length){$('dmsg').textContent=`You worked all ${queue.length} EFIS failures.`;$('done').classList.add('on');return}
+ qi++;loadScenario(queue[qi],Math.random()<.5?1:2);
+}
+$('ffail').innerHTML=FAILS.map((f,i)=>`<option value="${i}">${f.name}</option>`).join('');
+$('finject').onclick=()=>loadScenario(FAILS[+$('ffail').value],+$('fside').value);
+
+function paintSnd(){const b=$('sndb');b.textContent=soundOn?'Sound on':'Sound off';b.setAttribute('aria-pressed',soundOn)}
+$('sndb').onclick=()=>{soundOn=!soundOn;try{localStorage.setItem('efis1900snd',soundOn?'1':'0')}catch(e){}paintSnd();if(soundOn)click(true)};
+paintSnd();
+/* options */
+try{const m=localStorage.getItem('efis1900');if(m)mode=m}catch(e){}
+function selOpt(){document.querySelectorAll('.opt').forEach(b=>b.classList.toggle('sel',b.dataset.mode===mode))}
+document.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;selOpt()});
+$('ostart').onclick=()=>{try{localStorage.setItem('efis1900',mode)}catch(e){}begin()};
+$('ocancel').onclick=()=>{if(started)$('opt').classList.remove('on');else begin()};
+$('optb').onclick=()=>{selOpt();$('opt').classList.add('on')};
+$('dopt').onclick=()=>{$('done').classList.remove('on');selOpt();$('opt').classList.add('on')};
+$('drestart').onclick=()=>{$('done').classList.remove('on');begin()};
+clearFaults();cur=FAILS[0];render();paintCard();selOpt();$('opt').classList.add('on');
+</script>
+
+</body>
+</html>
